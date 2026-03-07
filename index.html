@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chronos - Watch Repair Tracker MVP</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar / Header -->
+        <header class="glass-panel main-header">
+            <div class="logo">
+                <i class="fa-solid fa-clock"></i>
+                <h1>Chronos <span>Tracker</span></h1>
+            </div>
+            <p class="tagline">Premium Repair Management</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Dashboard Stats -->
+            <section class="dashboard-stats">
+                <div class="stat-card glass-panel">
+                    <div class="stat-icon"><i class="fa-solid fa-list-check"></i></div>
+                    <div class="stat-info">
+                        <h3>Total Repairs</h3>
+                        <p id="stat-total">0</p>
+                    </div>
+                </div>
+                <div class="stat-card glass-panel">
+                    <div class="stat-icon warning"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+                    <div class="stat-info">
+                        <h3>In Progress</h3>
+                        <p id="stat-progress">0</p>
+                    </div>
+                </div>
+                <div class="stat-card glass-panel">
+                    <div class="stat-icon success"><i class="fa-solid fa-bell-concierge"></i></div>
+                    <div class="stat-info">
+                        <h3>Ready for Pickup</h3>
+                        <p id="stat-ready">0</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Actions -->
+            <section class="actions-section">
+                <h2>Recent Repairs</h2>
+                <div class="action-buttons" style="display: flex; gap: 1rem;">
+                    <button id="btn-export" class="btn-outline">
+                        <i class="fa-solid fa-file-excel" style="color: var(--success)"></i> Export to Excel
+                    </button>
+                    <button id="btn-add-repair" class="btn-primary">
+                        <i class="fa-solid fa-plus"></i> New Repair
+                    </button>
+                </div>
+            </section>
+
+            <!-- Tracker List -->
+            <section class="tracker-section class-panel">
+                <div class="table-container glass-panel">
+                    <table id="repairs-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Customer</th>
+                                <th>Watch details</th>
+                                <th>Status</th>
+                                <th>Est. Cost</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="repairs-list">
+                            <!-- Rows will be injected by JS -->
+                        </tbody>
+                    </table>
+                    <div id="empty-state" class="empty-state hidden">
+                        <i class="fa-regular fa-folder-open"></i>
+                        <p>No repairs tracked yet.</p>
+                        <button class="btn-outline" onclick="document.getElementById('btn-add-repair').click()">Add your
+                            first repair</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Add Repair Modal -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal glass-panel">
+            <div class="modal-header">
+                <h2>New Repair Log</h2>
+                <button id="btn-close-modal" class="btn-icon"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-repair">
+                <div class="form-group">
+                    <label for="customerName">Customer Name</label>
+                    <input type="text" id="customerName" required placeholder="John Doe">
+                </div>
+                <div class="form-group">
+                    <label for="customerPhone">Phone Number</label>
+                    <input type="tel" id="customerPhone" required placeholder="+1 234 567 8900">
+                </div>
+                <div class="form-group">
+                    <label for="watchModel">Watch Make & Model</label>
+                    <input type="text" id="watchModel" required placeholder="Rolex Submariner">
+                </div>
+                <div class="form-group">
+                    <label for="issueDesc">Issue Description</label>
+                    <textarea id="issueDesc" rows="3" required
+                        placeholder="Broken crystal, needs cleaning..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="estCost">Estimated Cost (₹)</label>
+                    <input type="number" id="estCost" min="0" step="0.01" required placeholder="1500.00">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-outline" id="btn-cancel">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Repair</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+
+</html>
