@@ -10,7 +10,7 @@
     --success: #22c55e;
     --warning: #facc15;
     --danger: #ef4444;
-    
+
     /* Glassmorphism */
     --glass-bg: rgba(255, 255, 255, 0.03);
     --glass-border: rgba(255, 255, 255, 0.08);
@@ -230,7 +230,8 @@ table {
     text-align: left;
 }
 
-th, td {
+th,
+td {
     padding: 1rem;
     border-bottom: 1px solid var(--glass-border);
 }
@@ -278,16 +279,39 @@ tbody tr:hover {
     display: inline-block;
 }
 
-.status-received { background: rgba(255, 255, 255, 0.1); color: var(--text-primary); }
-.status-diagnosing { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); }
-.status-parts { background: rgba(249, 115, 22, 0.15); color: #fb923c; }
-.status-fixing { background: rgba(250, 204, 21, 0.15); color: var(--warning); }
-.status-ready { background: rgba(34, 197, 94, 0.15); color: var(--success); }
-.status-delivered { background: rgba(148, 163, 184, 0.15); color: var(--text-secondary); }
+.status-received {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.status-diagnosing {
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--accent-blue);
+}
+
+.status-parts {
+    background: rgba(249, 115, 22, 0.15);
+    color: #fb923c;
+}
+
+.status-fixing {
+    background: rgba(250, 204, 21, 0.15);
+    color: var(--warning);
+}
+
+.status-ready {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--success);
+}
+
+.status-delivered {
+    background: rgba(148, 163, 184, 0.15);
+    color: var(--text-secondary);
+}
 
 /* Status Select */
 select.status-select {
-    background: rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.5);
     color: var(--text-primary);
     border: 1px solid var(--glass-border);
     padding: 0.25rem;
@@ -328,10 +352,12 @@ select.status-select {
     background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(4px);
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     z-index: 1000;
     opacity: 1;
+    overflow-y: auto;
+    padding: 2rem 1rem;
     transition: opacity 0.3s ease;
 }
 
@@ -344,7 +370,7 @@ select.status-select {
     width: 100%;
     max-width: 500px;
     padding: 2rem;
-    margin: 1rem;
+    margin: auto;
     transform: translateY(0);
     transition: transform 0.3s ease;
 }
@@ -408,7 +434,7 @@ select.status-select {
         grid-template-columns: 1fr;
         padding: 1rem;
     }
-    
+
     .main-header {
         position: relative;
         top: 0;
@@ -421,12 +447,13 @@ select.status-select {
     .tagline {
         display: none;
     }
-    
+
     .table-container {
         border-radius: 12px;
     }
-    
-    th, td {
+
+    th,
+    td {
         padding: 0.75rem;
     }
 }
