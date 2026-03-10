@@ -92,6 +92,7 @@ class RepairTracker {
     }
 
     generateId() {
+        // ID is now provided manually by the shop owner - keeping as fallback only
         return 'REP-' + Math.random().toString(36).substr(2, 6).toUpperCase();
     }
 
@@ -105,7 +106,7 @@ class RepairTracker {
         submitBtn.disabled = true;
 
         const newRepair = {
-            id: this.generateId(),
+            id: document.getElementById('repairId').value.trim(),
             customerName: document.getElementById('customerName').value,
             customerPhone: document.getElementById('customerPhone').value,
             watchModel: document.getElementById('watchModel').value,
@@ -157,7 +158,7 @@ class RepairTracker {
 
         // Construct the message
         let statusString = this.statusOptions[repair.status].toLowerCase();
-        let message = `Hello ${repair.customerName}, this is Chronos Watch Repair. Just an update that your ${repair.watchModel} is currently ${statusString}.`;
+        let message = `Hello ${repair.customerName}, this is Dhiraj Watch Vision. Just an update that your ${repair.watchModel} (Repair ID: ${repair.id}) is currently ${statusString}.`;
 
         if (repair.status === 'ready') {
             message += ` Your total comes to \u20b9${repair.estCost.toFixed(2)}. You can come pick it up anytime!`;
