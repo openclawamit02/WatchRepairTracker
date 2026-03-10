@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -12,8 +12,8 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
 
 class RepairTracker {
     constructor() {
@@ -71,8 +71,8 @@ class RepairTracker {
 
         onSnapshot(q, (snapshot) => {
             this.repairs = [];
-            snapshot.forEach((doc) => {
-                this.repairs.push({ firebaseId: doc.id, ...doc.data() });
+            snapshot.forEach((docSnap) => {
+                this.repairs.push({ firebaseId: docSnap.id, ...docSnap.data() });
             });
             this.render();
         }, (error) => {
@@ -130,9 +130,7 @@ class RepairTracker {
     async updateStatus(firebaseId, newStatus) {
         try {
             const repairRef = doc(db, "repairs", firebaseId);
-            await updateDoc(repairRef, {
-                status: newStatus
-            });
+            await updateDoc(repairRef, { status: newStatus });
         } catch (error) {
             console.error("Error updating document: ", error);
             alert("Error updating status in database.");
@@ -150,6 +148,26 @@ class RepairTracker {
         }
     }
 
+    sendWhatsAppMessage(firebaseId) {
+        const repair = this.repairs.find(r => r.firebaseId === firebaseId);
+        if (!repair) return;
+
+        // Clean the phone number (remove spaces, dashes, parentheses but keep + for country code)
+        let phone = repair.customerPhone.replace(/[^\d+]/g, '');
+
+        // Construct the message
+        let statusString = this.statusOptions[repair.status].toLowerCase();
+        let message = `Hello ${repair.customerName}, this is Chronos Watch Repair. Just an update that your ${repair.watchModel} is currently ${statusString}.`;
+
+        if (repair.status === 'ready') {
+            message += ` Your total comes to \u20b9${repair.estCost.toFixed(2)}. You can come pick it up anytime!`;
+        }
+
+        // Encode message for URL and open WhatsApp
+        const encodedMessage = encodeURIComponent(message);
+        window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank');
+    }
+
     exportToExcel() {
         if (this.repairs.length === 0) {
             alert("No repairs to export.");
@@ -162,9 +180,8 @@ class RepairTracker {
         // CSV Rows
         this.repairs.forEach(r => {
             const dateStr = new Date(r.dateAdded).toLocaleDateString();
-            const issueStr = `"${r.issueDesc.replace(/"/g, '""')}"`; // Escape quotes in case of commas
+            const issueStr = `"${r.issueDesc.replace(/"/g, '""')}"`;
             const statusLabel = this.statusOptions[r.status];
-
             const row = `${r.id},${dateStr},${r.customerName},${r.customerPhone},${r.watchModel},${issueStr},${r.estCost},${statusLabel}`;
             csvContent += row + "\n";
         });
@@ -200,7 +217,6 @@ class RepairTracker {
 
         this.table.classList.remove('hidden');
         this.emptyState.classList.add('hidden');
-
         this.tableBody.innerHTML = '';
 
         this.repairs.forEach(repair => {
@@ -214,7 +230,6 @@ class RepairTracker {
             }
             statusSelectHtml += `</select>`;
 
-            // Formatting date
             const dateStr = new Date(repair.dateAdded).toLocaleDateString();
 
             tr.innerHTML = `
@@ -234,21 +249,31 @@ class RepairTracker {
                     <span class="status-badge status-${repair.status}">${this.statusOptions[repair.status]}</span><br>
                     ${statusSelectHtml}
                 </td>
-                <td>₹${repair.estCost.toFixed(2)}</td>
+                <td>\u20b9${repair.estCost.toFixed(2)}</td>
                 <td>
-                    <button class="btn-icon delete-btn" data-id="${repair.firebaseId}" title="Delete">
-                        <i class="fa-solid fa-trash" style="color: var(--danger); pointer-events: none;"></i>
-                    </button>
+                    <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                        <button class="btn-icon whatsapp-btn" data-id="${repair.firebaseId}" title="Send WhatsApp Message">
+                            <i class="fa-brands fa-whatsapp" style="color: #25D366; pointer-events: none;"></i>
+                        </button>
+                        <button class="btn-icon delete-btn" data-id="${repair.firebaseId}" title="Delete">
+                            <i class="fa-solid fa-trash" style="color: var(--danger); pointer-events: none;"></i>
+                        </button>
+                    </div>
                 </td>
             `;
             this.tableBody.appendChild(tr);
         });
 
-        // Attach event listeners to newly created dom elements instead of inline onclick strings
-        // Inline onclick handlers fail in ES modules due to scope.
+        // Attach event listeners (inline onclick doesn't work inside ES modules)
         document.querySelectorAll('.status-select').forEach(select => {
             select.addEventListener('change', (e) => {
                 this.updateStatus(e.target.dataset.id, e.target.value);
+            });
+        });
+
+        document.querySelectorAll('.whatsapp-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.sendWhatsAppMessage(e.target.dataset.id);
             });
         });
 
