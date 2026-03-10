@@ -1,6 +1,23 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyCWUkUfOsrvkO1TkohrLp2YyAggvjNDD_U",
+    authDomain: "chronos-repair-tracker.firebaseapp.com",
+    projectId: "chronos-repair-tracker",
+    storageBucket: "chronos-repair-tracker.firebasestorage.app",
+    messagingSenderId: "460608490423",
+    appId: "1:460608490423:web:39b5c5aa35a84deb3e3632"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 class RepairTracker {
     constructor() {
-        this.repairs = JSON.parse(localStorage.getItem('chronos_repairs')) || [];
+        this.repairs = [];
         this.statusOptions = {
             'received': 'Received',
             'diagnosing': 'Diagnosing',
@@ -12,7 +29,7 @@ class RepairTracker {
 
         this.initDOM();
         this.bindEvents();
-        this.render();
+        this.setupRealtimeListener();
     }
 
     initDOM() {
@@ -48,6 +65,22 @@ class RepairTracker {
         this.form.addEventListener('submit', (e) => this.handleFormSubmit(e));
     }
 
+    // Real-time listener for Firestore
+    setupRealtimeListener() {
+        const q = query(collection(db, "repairs"), orderBy("dateAdded", "desc"));
+
+        onSnapshot(q, (snapshot) => {
+            this.repairs = [];
+            snapshot.forEach((doc) => {
+                this.repairs.push({ firebaseId: doc.id, ...doc.data() });
+            });
+            this.render();
+        }, (error) => {
+            console.error("Error listening to real-time updates: ", error);
+            alert("Could not connect to the database. Please ensure Firestore is set up and rules allow reading.");
+        });
+    }
+
     openModal() {
         this.modal.classList.remove('hidden');
         document.getElementById('customerName').focus();
@@ -62,8 +95,14 @@ class RepairTracker {
         return 'REP-' + Math.random().toString(36).substr(2, 6).toUpperCase();
     }
 
-    handleFormSubmit(e) {
+    async handleFormSubmit(e) {
         e.preventDefault();
+
+        // Change button state to indicate loading
+        const submitBtn = this.form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Saving...';
+        submitBtn.disabled = true;
 
         const newRepair = {
             id: this.generateId(),
@@ -76,31 +115,39 @@ class RepairTracker {
             dateAdded: new Date().toISOString()
         };
 
-        this.repairs.unshift(newRepair); // Add to top
-        this.saveData();
-        this.render();
-        this.closeModal();
-    }
-
-    updateStatus(id, newStatus) {
-        const index = this.repairs.findIndex(r => r.id === id);
-        if (index > -1) {
-            this.repairs[index].status = newStatus;
-            this.saveData();
-            this.render();
+        try {
+            await addDoc(collection(db, "repairs"), newRepair);
+            this.closeModal();
+        } catch (error) {
+            console.error("Error adding document: ", error);
+            alert("Error saving repair to database: " + error.message);
+        } finally {
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
         }
     }
 
-    deleteRepair(id) {
+    async updateStatus(firebaseId, newStatus) {
+        try {
+            const repairRef = doc(db, "repairs", firebaseId);
+            await updateDoc(repairRef, {
+                status: newStatus
+            });
+        } catch (error) {
+            console.error("Error updating document: ", error);
+            alert("Error updating status in database.");
+        }
+    }
+
+    async deleteRepair(firebaseId) {
         if (confirm('Are you sure you want to delete this log?')) {
-            this.repairs = this.repairs.filter(r => r.id !== id);
-            this.saveData();
-            this.render();
+            try {
+                await deleteDoc(doc(db, "repairs", firebaseId));
+            } catch (error) {
+                console.error("Error deleting document: ", error);
+                alert("Error deleting repair from database.");
+            }
         }
-    }
-
-    saveData() {
-        localStorage.setItem('chronos_repairs', JSON.stringify(this.repairs));
     }
 
     exportToExcel() {
@@ -160,7 +207,7 @@ class RepairTracker {
             const tr = document.createElement('tr');
 
             // Generate Status Dropdown
-            let statusSelectHtml = `<select class="status-select" onchange="app.updateStatus('${repair.id}', this.value)">`;
+            let statusSelectHtml = `<select class="status-select" data-id="${repair.firebaseId}">`;
             for (const [key, label] of Object.entries(this.statusOptions)) {
                 const selected = repair.status === key ? 'selected' : '';
                 statusSelectHtml += `<option value="${key}" ${selected}>${label}</option>`;
@@ -189,12 +236,26 @@ class RepairTracker {
                 </td>
                 <td>₹${repair.estCost.toFixed(2)}</td>
                 <td>
-                    <button class="btn-icon" onclick="app.deleteRepair('${repair.id}')" title="Delete">
-                        <i class="fa-solid fa-trash" style="color: var(--danger)"></i>
+                    <button class="btn-icon delete-btn" data-id="${repair.firebaseId}" title="Delete">
+                        <i class="fa-solid fa-trash" style="color: var(--danger); pointer-events: none;"></i>
                     </button>
                 </td>
             `;
             this.tableBody.appendChild(tr);
+        });
+
+        // Attach event listeners to newly created dom elements instead of inline onclick strings
+        // Inline onclick handlers fail in ES modules due to scope.
+        document.querySelectorAll('.status-select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                this.updateStatus(e.target.dataset.id, e.target.value);
+            });
+        });
+
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.deleteRepair(e.target.dataset.id);
+            });
         });
     }
 
@@ -206,6 +267,5 @@ class RepairTracker {
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', () => {
-    // Expose app instance to global scope to allow inline onclick handlers to access it
-    window.app = new RepairTracker();
+    window.appTracker = new RepairTracker();
 });
