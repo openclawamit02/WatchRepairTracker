@@ -22,6 +22,7 @@ class RepairTracker {
         this.repairs = [];
         this.currentUser = null;
         this.userRole = 'staff'; // default
+        this.editingId = null; // Track record being edited
         this.statusOptions = {
             'received': 'Received',
             'diagnosing': 'Diagnosing',
@@ -48,6 +49,7 @@ class RepairTracker {
 
         // Modal
         this.modal = document.getElementById('modal-overlay');
+        this.modalTitle = this.modal.querySelector('h2');
         this.form = document.getElementById('form-repair');
         this.btnAdd = document.getElementById('btn-add-repair');
         this.btnExport = document.getElementById('btn-export');
@@ -69,6 +71,7 @@ class RepairTracker {
         this.photoPreviewImg = document.getElementById('photo-preview');
         this.btnRemovePhoto = document.getElementById('btn-remove-photo');
         this.selectedFile = null;
+        this.existingPhotoUrl = '';
     }
 
     bindEvents() {
@@ -196,14 +199,47 @@ class RepairTracker {
     }
 
     openModal() {
+        this.editingId = null;
+        this.modalTitle.textContent = "New Repair Log";
         this.modal.classList.remove('hidden');
         document.getElementById('customerName').focus();
+    }
+
+    openEditModal(firebaseId) {
+        const repair = this.repairs.find(r => r.firebaseId === firebaseId);
+        if (!repair) return;
+
+        this.editingId = firebaseId;
+        this.modalTitle.textContent = "Edit Repair Log";
+        
+        // Populate fields
+        document.getElementById('repairId').value = repair.id || '';
+        document.getElementById('customerName').value = repair.customerName || '';
+        document.getElementById('customerPhone').value = repair.customerPhone || '';
+        document.getElementById('watchModel').value = repair.watchModel || '';
+        document.getElementById('issueDesc').value = repair.issueDesc || '';
+        document.getElementById('estCost').value = repair.estCost || 0;
+        
+        // Handle photo
+        if (repair.photoUrl) {
+            this.existingPhotoUrl = repair.photoUrl;
+            this.photoPreviewImg.src = repair.photoUrl;
+            this.photoPreviewContainer.classList.remove('hidden');
+        } else {
+            this.existingPhotoUrl = '';
+            this.photoPreviewImg.src = '';
+            this.photoPreviewContainer.classList.add('hidden');
+        }
+
+        this.modal.classList.remove('hidden');
     }
 
     closeModal() {
         this.modal.classList.add('hidden');
         this.form.reset();
         this.removeSelectedFile();
+        this.editingId = null;
+        this.existingPhotoUrl = '';
     }
 
     handleFileSelect(e) {
@@ -224,8 +260,10 @@ class RepairTracker {
     removeSelectedFile() {
         this.selectedFile = null;
         this.fileInput.value = '';
-        this.photoPreviewImg.src = '';
-        this.photoPreviewContainer.classList.add('hidden');
+        this.photoPreviewImg.src = this.existingPhotoUrl || '';
+        if (!this.existingPhotoUrl) {
+            this.photoPreviewContainer.classList.add('hidden');
+        }
     }
 
     async compressImage(file) {
@@ -259,8 +297,8 @@ class RepairTracker {
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
                     
-                    // Compress to JPEG with 0.7 quality to keep it small (well under 1MB)
-                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                    // Compress to JPEG with 0.6 quality (more aggressive)
+                    resolve(canvas.toDataURL('image/jpeg', 0.6));
                 };
             };
         });
@@ -277,34 +315,45 @@ class RepairTracker {
         // Change button state to indicate loading
         const submitBtn = this.form.querySelector('button[type="submit"]');
         const originalText = submitBtn.textContent;
-        submitBtn.textContent = 'Saving...';
+        submitBtn.textContent = this.editingId ? 'Updating...' : 'Saving...';
         submitBtn.disabled = true;
 
-        const newRepair = {
+        const repairData = {
             id: document.getElementById('repairId').value.trim(),
             customerName: document.getElementById('customerName').value,
             customerPhone: document.getElementById('customerPhone').value,
             watchModel: document.getElementById('watchModel').value,
             issueDesc: document.getElementById('issueDesc').value,
             estCost: parseFloat(document.getElementById('estCost').value),
-            status: 'received',
-            dateAdded: new Date().toISOString(),
-            photoUrl: ''
+            dateAdded: this.editingId ? (this.repairs.find(r => r.firebaseId === this.editingId).dateAdded) : new Date().toISOString(),
+            status: this.editingId ? (this.repairs.find(r => r.firebaseId === this.editingId).status) : 'received'
         };
 
         try {
-            // New Free Option: Resize and store as Base64 in Firestore
+            // Handle Photo
             if (this.selectedFile) {
                 submitBtn.textContent = 'Compressing Photo...';
-                newRepair.photoUrl = await this.compressImage(this.selectedFile);
+                repairData.photoUrl = await this.compressImage(this.selectedFile);
+            } else if (this.editingId) {
+                // If editing and no new file selected, keep existing photo (or none if it was removed)
+                repairData.photoUrl = this.photoPreviewContainer.classList.contains('hidden') ? '' : this.existingPhotoUrl;
+            } else {
+                repairData.photoUrl = '';
             }
 
             submitBtn.textContent = 'Saving Data...';
-            await addDoc(collection(db, "repairs"), newRepair);
+            
+            if (this.editingId) {
+                const repairRef = doc(db, "repairs", this.editingId);
+                await updateDoc(repairRef, repairData);
+            } else {
+                await addDoc(collection(db, "repairs"), repairData);
+            }
+
             this.closeModal();
         } catch (error) {
-            console.error("Error adding document: ", error);
-            alert("Error saving repair to database: " + error.message);
+            console.error("Error saving document: ", error);
+            alert("Error saving repair: " + error.message);
         } finally {
             submitBtn.textContent = originalText;
             submitBtn.disabled = false;
@@ -440,6 +489,9 @@ class RepairTracker {
                 <td>\u20b9${repair.estCost.toFixed(2)}</td>
                 <td>
                     <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                        <button class="btn-icon edit-btn" data-id="${repair.firebaseId}" title="Edit Repair">
+                            <i class="fa-solid fa-pen-to-square" style="color: var(--primary); pointer-events: none;"></i>
+                        </button>
                         <button class="btn-icon whatsapp-btn" data-id="${repair.firebaseId}" title="Send WhatsApp Message">
                             <i class="fa-brands fa-whatsapp" style="color: #25D366; pointer-events: none;"></i>
                         </button>
@@ -458,6 +510,12 @@ class RepairTracker {
         document.querySelectorAll('.status-select').forEach(select => {
             select.addEventListener('change', (e) => {
                 this.updateStatus(e.target.dataset.id, e.target.value);
+            });
+        });
+
+        document.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.openEditModal(e.target.dataset.id);
             });
         });
 
