@@ -1,6 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
 import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 
 // Your web app's Firebase configuration
@@ -16,7 +15,6 @@ const firebaseConfig = {
 // Initialize Firebase
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
-const storage = getStorage(firebaseApp);
 const auth = getAuth(firebaseApp);
 
 class RepairTracker {
@@ -230,6 +228,44 @@ class RepairTracker {
         this.photoPreviewContainer.classList.add('hidden');
     }
 
+    async compressImage(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 600;
+                    const MAX_HEIGHT = 600;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Compress to JPEG with 0.7 quality to keep it small (well under 1MB)
+                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                };
+            };
+        });
+    }
+
     generateId() {
         // ID is now provided manually by the shop owner - keeping as fallback only
         return 'REP-' + Math.random().toString(36).substr(2, 6).toUpperCase();
@@ -257,15 +293,10 @@ class RepairTracker {
         };
 
         try {
-            // Upload photo if selected
+            // New Free Option: Resize and store as Base64 in Firestore
             if (this.selectedFile) {
-                submitBtn.textContent = 'Uploading Photo...';
-                const fileExt = this.selectedFile.name.split('.').pop();
-                const fileName = `watch_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fileExt}`;
-                const storageRef = ref(storage, `watch_photos/${fileName}`);
-                
-                await uploadBytes(storageRef, this.selectedFile);
-                newRepair.photoUrl = await getDownloadURL(storageRef);
+                submitBtn.textContent = 'Compressing Photo...';
+                newRepair.photoUrl = await this.compressImage(this.selectedFile);
             }
 
             submitBtn.textContent = 'Saving Data...';
