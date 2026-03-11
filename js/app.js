@@ -20,6 +20,9 @@ const auth = getAuth(firebaseApp);
 class RepairTracker {
     constructor() {
         this.repairs = [];
+        this.filteredRepairs = [];
+        this.currentPage = 1;
+        this.pageSize = 10;
         this.currentUser = null;
         this.userRole = 'staff'; // default
         this.editingId = null; // Track record being edited
@@ -60,18 +63,39 @@ class RepairTracker {
         this.loginContainer = document.getElementById('login-container');
         this.appContainer = document.getElementById('app-container');
         this.loginForm = document.getElementById('form-login');
+        this.loadingOverlay = document.getElementById('loading-overlay');
         this.btnLogout = document.getElementById('btn-logout');
         this.btnForgot = document.getElementById('btn-forgot-password');
         this.authError = document.getElementById('auth-error');
         this.userRoleDisplay = document.getElementById('user-role');
+        
+        // Theme Toggle
+        this.themeToggleBtn = document.getElementById('btn-theme-toggle');
+        this.currentTheme = localStorage.getItem('theme') || 'dark';
+        this.initTheme();
 
         // Photo Upload elements
-        this.fileInput = document.getElementById('watchPhoto');
-        this.photoPreviewContainer = document.getElementById('photo-preview-container');
-        this.photoPreviewImg = document.getElementById('photo-preview');
-        this.btnRemovePhoto = document.getElementById('btn-remove-photo');
-        this.selectedFile = null;
+        this.photoInputBefore = document.getElementById('watchPhotoBefore');
+        this.photoInputAfter = document.getElementById('watchPhotoAfter');
+        this.previewBefore = document.getElementById('preview-before');
+        this.previewAfter = document.getElementById('preview-after');
+        this.previewBeforeContainer = document.getElementById('preview-before-container');
+        this.previewAfterContainer = document.getElementById('preview-after-container');
+        
+        this.photoBeforeUrl = null;
+        this.photoAfterUrl = null;
         this.existingPhotoUrl = '';
+
+        // Filter elements
+        this.searchInput = document.getElementById('search-input');
+        this.dateStartInput = document.getElementById('date-start');
+        this.dateEndInput = document.getElementById('date-end');
+        this.btnClearFilters = document.getElementById('btn-clear-filters');
+
+        // Pagination elements
+        this.btnPrev = document.getElementById('btn-prev');
+        this.btnNext = document.getElementById('btn-next');
+        this.pageInfo = document.getElementById('page-info');
     }
 
     bindEvents() {
@@ -93,8 +117,27 @@ class RepairTracker {
         this.btnForgot.addEventListener('click', () => this.handleForgotPassword());
 
         // Photo Upload Events
-        this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
-        this.btnRemovePhoto.addEventListener('click', () => this.removeSelectedFile());
+        this.themeToggleBtn.addEventListener('click', () => this.toggleTheme());
+        this.photoInputBefore.addEventListener('change', (e) => this.handlePhotoUpload(e, 'before'));
+        this.photoInputAfter.addEventListener('change', (e) => this.handlePhotoUpload(e, 'after'));
+        
+        // Delegate photo removal
+        document.querySelectorAll('.btn-remove-photo').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const target = e.currentTarget.dataset.target;
+                this.removePhoto(target);
+            });
+        });
+
+        // Filter Events
+        this.searchInput.addEventListener('input', () => this.applyFilters());
+        this.dateStartInput.addEventListener('change', () => this.applyFilters());
+        this.dateEndInput.addEventListener('change', () => this.applyFilters());
+        this.btnClearFilters.addEventListener('click', () => this.clearFilters());
+
+        // Pagination Events
+        this.btnPrev.addEventListener('click', () => this.changePage(-1));
+        this.btnNext.addEventListener('click', () => this.changePage(1));
     }
 
     // Real-time listener for Firestore
@@ -182,13 +225,26 @@ class RepairTracker {
         this.appContainer.classList.remove('hidden');
         this.userRoleDisplay.textContent = this.userRole.charAt(0).toUpperCase() + this.userRole.slice(1);
         
-        if (this.userRole === 'staff') {
-            this.btnExport.classList.add('hidden');
-        } else {
-            this.btnExport.classList.remove('hidden');
-        }
+        // Export is now available for everyone as per request
+        this.btnExport.classList.remove('hidden');
         
         this.render();
+    }
+
+    initTheme() {
+        if (this.currentTheme === 'light') {
+            document.body.classList.add('light-theme');
+            this.themeToggleBtn.querySelector('i').className = 'fa-solid fa-sun';
+        } else {
+            document.body.classList.remove('light-theme');
+            this.themeToggleBtn.querySelector('i').className = 'fa-solid fa-moon';
+        }
+    }
+
+    toggleTheme() {
+        this.currentTheme = this.currentTheme === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('theme', this.currentTheme);
+        this.initTheme();
     }
 
     showLogin() {
@@ -201,8 +257,19 @@ class RepairTracker {
     openModal() {
         this.editingId = null;
         this.modalTitle.textContent = "New Repair Log";
+        
+        // Set default dates
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('repairDate').value = today;
+        
+        // Default due date: today + 3 days
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 3);
+        document.getElementById('dueDate').value = dueDate.toISOString().split('T')[0];
+        
+        this.closeModal(); // Reset form and photo previews
         this.modal.classList.remove('hidden');
-        document.getElementById('customerName').focus();
+        document.getElementById('repairId').focus();
     }
 
     openEditModal(firebaseId) {
@@ -213,56 +280,138 @@ class RepairTracker {
         this.modalTitle.textContent = "Edit Repair Log";
         
         // Populate fields
+        document.getElementById('repairDate').value = repair.dateAdded ? new Date(repair.dateAdded).toISOString().split('T')[0] : '';
+        document.getElementById('dueDate').value = repair.dueDate ? new Date(repair.dueDate).toISOString().split('T')[0] : '';
         document.getElementById('repairId').value = repair.id || '';
+        document.getElementById('priority').value = repair.priority || 'medium';
+        document.getElementById('receivedBy').value = repair.receivedBy || '';
         document.getElementById('customerName').value = repair.customerName || '';
-        document.getElementById('customerPhone').value = repair.customerPhone || '';
+        
+        // Remove +91 prefix for editing if present
+        let phone = repair.customerPhone || '';
+        if (phone.startsWith('+91')) {
+            phone = phone.replace('+91', '');
+        }
+        document.getElementById('customerPhone').value = phone.trim();
+        
         document.getElementById('watchModel').value = repair.watchModel || '';
         document.getElementById('issueDesc').value = repair.issueDesc || '';
         document.getElementById('estCost').value = repair.estCost || 0;
-        
-        // Handle photo
-        if (repair.photoUrl) {
-            this.existingPhotoUrl = repair.photoUrl;
-            this.photoPreviewImg.src = repair.photoUrl;
-            this.photoPreviewContainer.classList.remove('hidden');
+        document.getElementById('advancePaid').value = repair.advancePaid || 0;
+
+        // Photos
+        this.photoBeforeUrl = repair.photoBeforeUrl || null;
+        this.photoAfterUrl = repair.photoAfterUrl || null;
+
+        if (this.photoBeforeUrl) {
+            this.previewBefore.src = this.photoBeforeUrl;
+            this.previewBeforeContainer.classList.remove('hidden');
         } else {
-            this.existingPhotoUrl = '';
-            this.photoPreviewImg.src = '';
-            this.photoPreviewContainer.classList.add('hidden');
+            this.previewBeforeContainer.classList.add('hidden');
         }
 
+        if (this.photoAfterUrl) {
+            this.previewAfter.src = this.photoAfterUrl;
+            this.previewAfterContainer.classList.remove('hidden');
+        } else {
+            this.previewAfterContainer.classList.add('hidden');
+        }
+        
         this.modal.classList.remove('hidden');
     }
 
     closeModal() {
         this.modal.classList.add('hidden');
         this.form.reset();
-        this.removeSelectedFile();
         this.editingId = null;
-        this.existingPhotoUrl = '';
+        this.photoBeforeUrl = null;
+        this.photoAfterUrl = null;
+        this.photoInputBefore.value = '';
+        this.photoInputAfter.value = '';
+        this.previewBeforeContainer.classList.add('hidden');
+        this.previewAfterContainer.classList.add('hidden');
     }
 
-    handleFileSelect(e) {
+    async handlePhotoUpload(e, type) {
         const file = e.target.files[0];
         if (!file) return;
 
-        this.selectedFile = file;
-        const reader = new FileReader();
-
-        reader.onload = (event) => {
-            this.photoPreviewImg.src = event.target.result;
-            this.photoPreviewContainer.classList.remove('hidden');
-        };
-
-        reader.readAsDataURL(file);
+        try {
+            const base64 = await this.compressImage(file);
+            if (type === 'before') {
+                this.photoBeforeUrl = base64;
+                this.previewBefore.src = base64;
+                this.previewBeforeContainer.classList.remove('hidden');
+            } else {
+                this.photoAfterUrl = base64;
+                this.previewAfter.src = base64;
+                this.previewAfterContainer.classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error('Error uploading photo:', error);
+            alert('Failed to process image');
+        }
     }
 
-    removeSelectedFile() {
-        this.selectedFile = null;
-        this.fileInput.value = '';
-        this.photoPreviewImg.src = this.existingPhotoUrl || '';
-        if (!this.existingPhotoUrl) {
-            this.photoPreviewContainer.classList.add('hidden');
+    removePhoto(targetId) {
+        if (targetId === 'watchPhotoBefore') {
+            this.photoBeforeUrl = null;
+            this.photoInputBefore.value = '';
+            this.previewBeforeContainer.classList.add('hidden');
+        } else {
+            this.photoAfterUrl = null;
+            this.photoInputAfter.value = '';
+            this.previewAfterContainer.classList.add('hidden');
+        }
+    }
+
+    applyFilters() {
+        const searchTerm = this.searchInput.value.toLowerCase().trim();
+        const startDate = this.dateStartInput.value;
+        const endDate = this.dateEndInput.value;
+
+        this.filteredRepairs = this.repairs.filter(repair => {
+            // Search filter (Receipt #, Name, Mobile Number)
+            // Normalize mobile number for searching (remove spaces, etc. and ignore +91)
+            const normalizedSearch = searchTerm.replace(/\D/g, '');
+            const normalizedPhone = repair.customerPhone.replace(/\D/g, '');
+            
+            const matchesSearch = !searchTerm || 
+                repair.customerName.toLowerCase().includes(searchTerm) || 
+                repair.id.toLowerCase().includes(searchTerm) ||
+                (normalizedSearch && normalizedPhone.includes(normalizedSearch));
+
+            // Date filter
+            let matchesDate = true;
+            if (startDate || endDate) {
+                const repairDate = new Date(repair.dateAdded).toISOString().split('T')[0];
+                if (startDate && repairDate < startDate) matchesDate = false;
+                if (endDate && repairDate > endDate) matchesDate = false;
+            }
+
+            return matchesSearch && matchesDate;
+        });
+
+        // Reset to page 1 when filters change
+        this.currentPage = 1;
+        this.renderTable();
+        this.renderStats();
+    }
+
+    clearFilters() {
+        this.searchInput.value = '';
+        this.dateStartInput.value = '';
+        this.dateEndInput.value = '';
+        this.applyFilters();
+    }
+
+    changePage(offset) {
+        const totalPages = Math.ceil(this.filteredRepairs.length / this.pageSize);
+        const newPage = this.currentPage + offset;
+        
+        if (newPage >= 1 && newPage <= totalPages) {
+            this.currentPage = newPage;
+            this.renderTable();
         }
     }
 
@@ -318,29 +467,28 @@ class RepairTracker {
         submitBtn.textContent = this.editingId ? 'Updating...' : 'Saving...';
         submitBtn.disabled = true;
 
+        const repairDateValue = document.getElementById('repairDate').value;
+        const dueDateValue = document.getElementById('dueDate').value;
+        const phoneValue = document.getElementById('customerPhone').value.trim();
+        
         const repairData = {
             id: document.getElementById('repairId').value.trim(),
+            priority: document.getElementById('priority').value,
+            receivedBy: document.getElementById('receivedBy').value.trim(),
             customerName: document.getElementById('customerName').value,
-            customerPhone: document.getElementById('customerPhone').value,
+            customerPhone: phoneValue.includes('+') ? phoneValue : '+91' + phoneValue,
             watchModel: document.getElementById('watchModel').value,
             issueDesc: document.getElementById('issueDesc').value,
             estCost: parseFloat(document.getElementById('estCost').value),
-            dateAdded: this.editingId ? (this.repairs.find(r => r.firebaseId === this.editingId).dateAdded) : new Date().toISOString(),
+            advancePaid: parseFloat(document.getElementById('advancePaid').value || 0),
+            dateAdded: repairDateValue ? new Date(repairDateValue).toISOString() : new Date().toISOString(),
+            dueDate: dueDateValue ? new Date(dueDateValue).toISOString() : null,
+            photoBeforeUrl: this.photoBeforeUrl,
+            photoAfterUrl: this.photoAfterUrl,
             status: this.editingId ? (this.repairs.find(r => r.firebaseId === this.editingId).status) : 'received'
         };
 
         try {
-            // Handle Photo
-            if (this.selectedFile) {
-                submitBtn.textContent = 'Compressing Photo...';
-                repairData.photoUrl = await this.compressImage(this.selectedFile);
-            } else if (this.editingId) {
-                // If editing and no new file selected, keep existing photo (or none if it was removed)
-                repairData.photoUrl = this.photoPreviewContainer.classList.contains('hidden') ? '' : this.existingPhotoUrl;
-            } else {
-                repairData.photoUrl = '';
-            }
-
             submitBtn.textContent = 'Saving Data...';
             
             if (this.editingId) {
@@ -410,12 +558,14 @@ class RepairTracker {
         // CSV Header
         let csvContent = "ID,Date Added,Customer Name,Phone,Watch Details,Issue,Est. Cost (INR),Status\n";
 
-        // CSV Rows
+        // CSV Rows - Always export everything as requested
         this.repairs.forEach(r => {
             const dateStr = new Date(r.dateAdded).toLocaleDateString();
+            const customerNameCSV = `"${r.customerName.replace(/"/g, '""')}"`;
+            const watchModelCSV = `"${r.watchModel.replace(/"/g, '""')}"`;
             const issueStr = `"${r.issueDesc.replace(/"/g, '""')}"`;
             const statusLabel = this.statusOptions[r.status];
-            const row = `${r.id},${dateStr},${r.customerName},${r.customerPhone},${r.watchModel},${issueStr},${r.estCost},${statusLabel}`;
+            const row = `${r.id},${dateStr},${customerNameCSV},${r.customerPhone},${watchModelCSV},${issueStr},${r.estCost},${statusLabel}`;
             csvContent += row + "\n";
         });
 
@@ -442,9 +592,13 @@ class RepairTracker {
     }
 
     renderTable() {
-        if (this.repairs.length === 0) {
+        const totalFiltered = this.filteredRepairs.length;
+        const totalPages = Math.ceil(totalFiltered / this.pageSize) || 1;
+
+        if (totalFiltered === 0) {
             this.table.classList.add('hidden');
             this.emptyState.classList.remove('hidden');
+            this.pageInfo.textContent = `Page 1 of 1`;
             return;
         }
 
@@ -452,7 +606,11 @@ class RepairTracker {
         this.emptyState.classList.add('hidden');
         this.tableBody.innerHTML = '';
 
-        this.repairs.forEach(repair => {
+        // Pagination slice
+        const startIndex = (this.currentPage - 1) * this.pageSize;
+        const pageData = this.filteredRepairs.slice(startIndex, startIndex + this.pageSize);
+
+        pageData.forEach(repair => {
             const tr = document.createElement('tr');
 
             // Generate Status Dropdown
@@ -464,47 +622,70 @@ class RepairTracker {
             statusSelectHtml += `</select>`;
 
             const dateStr = new Date(repair.dateAdded).toLocaleDateString();
-            const photoHtml = repair.photoUrl 
-                ? `<div class="table-photo" data-url="${repair.photoUrl}"><img src="${repair.photoUrl}" alt="Watch"></div>`
-                : `<div class="table-photo empty"><i class="fa-solid fa-image"></i></div>`;
+            const photoBeforeHtml = repair.photoBeforeUrl 
+                ? `<div class="table-photo" onclick="window.open('${repair.photoBeforeUrl}', '_blank')"><img src="${repair.photoBeforeUrl}" alt="Before"></div>`
+                : `<div class="table-photo empty" title="No Before Photo"><i class="fa-solid fa-camera"></i></div>`;
+            
+            const photoAfterHtml = repair.photoAfterUrl 
+                ? `<div class="table-photo" onclick="window.open('${repair.photoAfterUrl}', '_blank')"><img src="${repair.photoAfterUrl}" alt="After"></div>`
+                : `<div class="table-photo empty" title="No After Photo"><i class="fa-solid fa-camera-rotate"></i></div>`;
+
+            const priorityClass = `priority-${repair.priority || 'medium'}`;
+            const priorityLabel = (repair.priority || 'medium').toUpperCase();
+
+            const total = repair.estCost || 0;
+            const advance = repair.advancePaid || 0;
+            const balance = total - advance;
 
             tr.innerHTML = `
+                <td><strong>${repair.id}</strong></td>
                 <td>
-                    <strong>${repair.id}</strong><br>
-                    <span style="font-size: 0.75rem; color: var(--text-secondary)">${dateStr}</span>
-                </td>
-                <td>${photoHtml}</td>
-                <td>
-                    <span class="customer-name">${repair.customerName}</span>
-                    <span class="customer-phone">${repair.customerPhone}</span>
+                    <span style="font-size: 0.85rem; color: var(--text-secondary)">${dateStr}</span><br>
+                    <span style="font-size: 0.7rem; color: var(--text-secondary)">By: ${repair.receivedBy || 'N/A'}</span>
                 </td>
                 <td>
-                    <strong>${repair.watchModel}</strong><br>
-                    <span style="font-size: 0.85rem; color: var(--text-secondary); display: inline-block; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${repair.issueDesc}">${repair.issueDesc}</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <div style="display: flex; gap: 4px;">
+                            ${photoBeforeHtml}
+                            ${photoAfterHtml}
+                        </div>
+                        <div style="margin-left: 4px;">
+                            <span class="customer-name">${repair.customerName}</span><br>
+                            <span style="font-size: 0.85rem; color: var(--text-primary); font-weight: 500;">${repair.watchModel}</span><br>
+                            <span style="font-size: 0.75rem; color: var(--text-secondary); display: block; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${repair.issueDesc}">${repair.issueDesc}</span>
+                        </div>
+                    </div>
                 </td>
+                <td><span class="priority-badge ${priorityClass}">${priorityLabel}</span></td>
                 <td>
-                    <span class="status-badge status-${repair.status}">${this.statusOptions[repair.status]}</span><br>
                     ${statusSelectHtml}
                 </td>
-                <td>\u20b9${repair.estCost.toFixed(2)}</td>
                 <td>
-                    <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                        <button class="btn-icon edit-btn" data-id="${repair.firebaseId}" title="Edit Repair">
-                            <i class="fa-solid fa-pen-to-square" style="color: var(--primary); pointer-events: none;"></i>
-                        </button>
-                        <button class="btn-icon whatsapp-btn" data-id="${repair.firebaseId}" title="Send WhatsApp Message">
-                            <i class="fa-brands fa-whatsapp" style="color: #25D366; pointer-events: none;"></i>
-                        </button>
+                    <div class="finance-info">
+                        Total: ₹${total.toLocaleString()}<br>
+                        Adv: ₹${advance.toLocaleString()}<br>
+                        <span class="${balance <= 0 ? 'paid-full' : 'balance-due'}">
+                            ${balance <= 0 ? 'PAID' : 'Bal: ₹' + balance.toLocaleString()}
+                        </span>
+                    </div>
+                </td>
+                <td>
+                    <div class="table-actions" style="display: flex; gap: 4px;">
+                        <button class="btn-icon edit-btn" data-id="${repair.firebaseId}" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button class="btn-icon whatsapp-btn" data-id="${repair.firebaseId}" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>
                         ${this.userRole === 'admin' ? `
-                        <button class="btn-icon delete-btn" data-id="${repair.firebaseId}" title="Delete">
-                            <i class="fa-solid fa-trash" style="color: var(--danger); pointer-events: none;"></i>
-                        </button>
+                        <button class="btn-icon delete-btn" data-id="${repair.firebaseId}" title="Delete"><i class="fa-solid fa-trash"></i></button>
                         ` : ''}
                     </div>
                 </td>
             `;
             this.tableBody.appendChild(tr);
         });
+
+        // Update Pagination Info
+        this.pageInfo.textContent = `Page ${this.currentPage} of ${totalPages}`;
+        this.btnPrev.disabled = this.currentPage === 1;
+        this.btnNext.disabled = this.currentPage === totalPages;
 
         // Attach event listeners (inline onclick doesn't work inside ES modules)
         document.querySelectorAll('.status-select').forEach(select => {
@@ -540,8 +721,7 @@ class RepairTracker {
     }
 
     render() {
-        this.renderStats();
-        this.renderTable();
+        this.applyFilters(); // This calls renderTable and renderStats
     }
 }
 

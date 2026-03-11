@@ -1,5 +1,5 @@
 :root {
-    /* Color Palette */
+    /* Color Palette - Dark (Default) */
     --bg-dark: #0f172a;
     --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
     --text-primary: #f8fafc;
@@ -20,6 +20,25 @@
     /* Misc */
     --radius: 16px;
     --transition: all 0.3s ease;
+}
+
+body.light-theme {
+    /* Color Palette - Light */
+    --bg-dark: #f1f5f9;
+    --bg-gradient: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --accent-gold: #d97706;
+    --accent-gold-hover: #b45309;
+    --accent-blue: #0284c7;
+    --success: #16a34a;
+    --warning: #ca8a04;
+    --danger: #dc2626;
+
+    /* Glassmorphism - Adjusted for Light */
+    --glass-bg: rgba(255, 255, 255, 0.6);
+    --glass-border: rgba(0, 0, 0, 0.05);
+    --glass-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.05);
 }
 
 * {
@@ -68,14 +87,40 @@ body {
     gap: 2rem;
 }
 
-.user-info-sidebar {
+.header-actions {
     margin-top: auto;
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.5rem;
     padding-top: 1.5rem;
     border-top: 1px solid var(--glass-border);
+}
+
+.btn-theme-toggle {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: var(--accent-gold);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: var(--transition);
+}
+
+.btn-theme-toggle:hover {
+    transform: rotate(30deg);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.user-info-sidebar {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
 .user-badge {
@@ -353,6 +398,44 @@ tbody tr:hover {
     color: var(--text-secondary);
 }
 
+/* Priority Badges */
+.priority-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.priority-low {
+    background: rgba(34, 197, 94, 0.1);
+    color: var(--success);
+}
+
+.priority-medium {
+    background: rgba(250, 204, 21, 0.1);
+    color: var(--warning);
+}
+
+.priority-high {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+}
+
+/* Finance Styles */
+.finance-info {
+    font-size: 0.85rem;
+}
+
+.balance-due {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.paid-full {
+    color: var(--success);
+}
+
 /* Status Select */
 select.status-select {
     background: rgba(0, 0, 0, 0.5);
@@ -435,6 +518,15 @@ select.status-select {
 }
 
 /* Forms */
+.form-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.flex-1 {
+    flex: 1;
+}
+
 .form-group {
     margin-bottom: 1.25rem;
 }
@@ -460,9 +552,28 @@ select.status-select {
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group select:focus {
     outline: none;
     border-color: var(--accent-gold);
+}
+
+.form-group select {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+    color: var(--text-primary);
+    padding: 3px 1rem; /* Adjust padding for selects */
+    height: 40px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    appearance: none;
+    cursor: pointer;
+}
+
+.light-theme .form-group select {
+    background: white;
 }
 
 .form-actions {
@@ -601,7 +712,7 @@ select.status-select {
 .photo-preview {
     position: relative;
     width: 100%;
-    max-height: 200px;
+    height: 120px; /* Smaller for two side-by-side */
     border-radius: 8px;
     overflow: hidden;
     background: rgba(0, 0, 0, 0.3);
@@ -636,6 +747,122 @@ select.status-select {
     transform: scale(1.1);
 }
 
+/* Phone Input Prefix Styling */
+.phone-input-wrapper {
+    display: flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.3s;
+}
+
+.phone-input-wrapper:focus-within {
+    border-color: var(--accent-gold);
+}
+
+.phone-prefix {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--accent-blue);
+    padding: 0.75rem 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-right: 1px solid var(--glass-border);
+    user-select: none;
+}
+
+.phone-input-wrapper input {
+    flex: 1;
+    background: transparent !important;
+    border: none !important;
+    padding: 0.75rem 1rem;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.95rem;
+}
+
+.phone-input-wrapper input:focus {
+    outline: none;
+}
+
+/* Filters Section */
+.filters-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    align-items: flex-end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-group label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filter-group input {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+    color: var(--text-primary);
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    outline: none;
+    transition: var(--transition);
+}
+
+.filter-group input:focus {
+    border-color: var(--accent-blue);
+}
+
+/* Pagination Controls */
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 1rem;
+    border-top: 1px solid var(--glass-border);
+}
+
+.pagination-controls span {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.btn-icon.circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    border: 1px solid var(--glass-border);
+}
+
+.btn-icon.circle:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.btn-icon.circle:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .app-container {
@@ -654,6 +881,15 @@ select.status-select {
 
     .tagline {
         display: none;
+    }
+
+    .filters-section {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filter-group {
+        min-width: 100%;
     }
 
     .table-container {

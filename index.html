@@ -46,14 +46,19 @@
                 <h1>Chronos <span>Tracker</span></h1>
             </div>
             <p class="tagline">Premium Repair Management</p>
-            <div class="user-info-sidebar">
-                <div class="user-badge">
-                    <i class="fa-solid fa-user-circle"></i>
-                    <span id="user-role">Admin</span>
-                </div>
-                <button id="btn-logout" class="btn-logout">
-                    <i class="fa-solid fa-right-from-bracket"></i> Logout
+            <div class="header-actions">
+                <button id="btn-theme-toggle" class="btn-theme-toggle" title="Toggle Light/Dark Mode">
+                    <i class="fa-solid fa-moon"></i>
                 </button>
+                <div class="user-info-sidebar">
+                    <div class="user-badge">
+                        <i class="fa-solid fa-user-circle"></i>
+                        <span id="user-role">Admin</span>
+                    </div>
+                    <button id="btn-logout" class="btn-logout">
+                        <i class="fa-solid fa-right-from-bracket"></i> Logout
+                    </button>
+                </div>
             </div>
         </header>
 
@@ -84,6 +89,25 @@
                 </div>
             </section>
 
+            <!-- Filters Section -->
+            <section class="filters-section glass-panel">
+                <div class="filter-group">
+                    <label for="search-input"><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+                    <input type="text" id="search-input" placeholder="Name or Repair ID...">
+                </div>
+                <div class="filter-group">
+                    <label for="date-start"><i class="fa-solid fa-calendar"></i> From</label>
+                    <input type="date" id="date-start">
+                </div>
+                <div class="filter-group">
+                    <label for="date-end"><i class="fa-solid fa-calendar"></i> To</label>
+                    <input type="date" id="date-end">
+                </div>
+                <div class="filter-group">
+                    <button id="btn-clear-filters" class="btn-link">Clear All</button>
+                </div>
+            </section>
+
             <!-- Actions -->
             <section class="actions-section">
                 <h2>Recent Repairs</h2>
@@ -104,11 +128,11 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Photo</th>
-                                <th>Customer</th>
-                                <th>Watch details</th>
+                                <th>Date</th>
+                                <th>Details</th>
+                                <th>Priority</th>
                                 <th>Status</th>
-                                <th>Est. Cost</th>
+                                <th>Finance</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -116,6 +140,13 @@
                             <!-- Rows will be injected by JS -->
                         </tbody>
                     </table>
+                    
+                    <!-- Pagination Controls -->
+                    <div id="pagination-controls" class="pagination-controls">
+                        <button id="btn-prev" class="btn-icon circle"><i class="fa-solid fa-chevron-left"></i></button>
+                        <span id="page-info">Page 1 of 1</span>
+                        <button id="btn-next" class="btn-icon circle"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
                     <div id="empty-state" class="empty-state hidden">
                         <i class="fa-regular fa-folder-open"></i>
                         <p>No repairs tracked yet.</p>
@@ -135,9 +166,33 @@
                 <button id="btn-close-modal" class="btn-icon"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form id="form-repair">
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label for="repairDate">Date Created</label>
+                        <input type="date" id="repairDate" required>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="dueDate">Due Date</label>
+                        <input type="date" id="dueDate" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label for="repairId">Receipt # / Repair ID</label>
+                        <input type="text" id="repairId" required placeholder="e.g. WR-001">
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="priority">Priority</label>
+                        <select id="priority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="form-group">
-                    <label for="repairId">Repair ID / Serial No.</label>
-                    <input type="text" id="repairId" required placeholder="e.g. WR-001 or 2024-15">
+                    <label for="receivedBy">Received By (Your name)</label>
+                    <input type="text" id="receivedBy" required placeholder="Who is taking this order?">
                 </div>
                 <div class="form-group">
                     <label for="customerName">Customer Name</label>
@@ -145,7 +200,10 @@
                 </div>
                 <div class="form-group">
                     <label for="customerPhone">Phone Number</label>
-                    <input type="tel" id="customerPhone" required placeholder="98765 43210" value="+91">
+                    <div class="phone-input-wrapper">
+                        <span class="phone-prefix">+91</span>
+                        <input type="tel" id="customerPhone" required placeholder="98765 43210">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="watchModel">Watch Make & Model</label>
@@ -156,20 +214,41 @@
                     <textarea id="issueDesc" rows="3" required
                         placeholder="Broken crystal, needs cleaning..."></textarea>
                 </div>
-                <div class="form-group">
-                    <label for="estCost">Estimated Cost (₹)</label>
-                    <input type="number" id="estCost" min="0" step="0.01" required placeholder="1500.00">
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label for="estCost">Total Cost (₹)</label>
+                        <input type="number" id="estCost" min="0" step="0.01" required placeholder="1500.00">
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="advancePaid">Advance Paid (₹)</label>
+                        <input type="number" id="advancePaid" min="0" step="0.01" value="0">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="watchPhoto">Watch Photo</label>
-                    <div class="photo-upload-wrapper">
-                        <label for="watchPhoto" class="photo-upload-label">
-                            <i class="fa-solid fa-camera"></i> <span>Upload Photo</span>
-                            <input type="file" id="watchPhoto" accept="image/*" class="hidden">
-                        </label>
-                        <div id="photo-preview-container" class="photo-preview hidden">
-                            <img id="photo-preview" src="" alt="Preview">
-                            <button type="button" id="btn-remove-photo" class="btn-remove-photo"><i class="fa-solid fa-xmark"></i></button>
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label for="watchPhotoBefore">Before Photo</label>
+                        <div class="photo-upload-wrapper">
+                            <label for="watchPhotoBefore" class="photo-upload-label">
+                                <i class="fa-solid fa-camera"></i> <span>Before</span>
+                                <input type="file" id="watchPhotoBefore" accept="image/*" class="hidden">
+                            </label>
+                            <div id="preview-before-container" class="photo-preview hidden">
+                                <img id="preview-before" src="" alt="Before">
+                                <button type="button" class="btn-remove-photo" data-target="watchPhotoBefore"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="watchPhotoAfter">After Photo</label>
+                        <div class="photo-upload-wrapper">
+                            <label for="watchPhotoAfter" class="photo-upload-label">
+                                <i class="fa-solid fa-camera-rotate"></i> <span>After</span>
+                                <input type="file" id="watchPhotoAfter" accept="image/*" class="hidden">
+                            </label>
+                            <div id="preview-after-container" class="photo-preview hidden">
+                                <img id="preview-after" src="" alt="After">
+                                <button type="button" class="btn-remove-photo" data-target="watchPhotoAfter"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
                         </div>
                     </div>
                 </div>
